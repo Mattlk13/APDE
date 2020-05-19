@@ -1,21 +1,22 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 27
-    buildToolsVersion '27.0.3'
+    compileSdkVersion 28
 
     defaultConfig {
         applicationId "com.calsignlabs.apde"
-        minSdkVersion 17
-        targetSdkVersion 27
-        versionCode 31
-        versionName "0.5.1"
+        minSdkVersion 19
+        targetSdkVersion 28
+        versionCode 32
+        versionName "0.5.2-pre1"
+        multiDexEnabled true
     }
 
     buildTypes {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-project.txt'
+            multiDexKeepProguard file('multidex-config.pro')
 
             lintOptions {
                 disable 'MissingTranslation'
@@ -25,6 +26,7 @@ android {
         debug {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-project.txt'
+            multiDexKeepProguard file('multidex-config.pro')
         }
     }
 
@@ -34,36 +36,50 @@ android {
     }
 
     dexOptions {
-        javaMaxHeapSize "4g"
+        preDexLibraries = false
+        javaMaxHeapSize "2048M"
     }
 
     sourceSets { main { res.srcDirs = ['src/main/res'] } }
+
+    lintOptions {
+        abortOnError false
+    }
+    buildToolsVersion = '29.0.3'
 }
 
 dependencies {
-    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
-    compile project(':aFileChooser')
-    compile files('libs/android-core.jar')
-    compile files('libs/antlr.jar')
-    compile files('libs/core-1.51.0.0.jar')
-    compile files('libs/dx.jar')
-    compile files('libs/ecj.jar')
-    compile files('libs/JavaMode.jar')
-    compile files('libs/jsch-0.1.51.jar')
-    compile files('libs/kellinwood-logging-android-1.4.jar')
-    compile files('libs/kellinwood-logging-lib-1.1.jar')
-    compile files('libs/org.eclipse.jgit-3.5.2.201411120430-r.jar')
-    compile files('libs/pde.jar')
-    compile files('libs/pkix-1.51.0.0.jar')
-    compile files('libs/prov-1.51.0.0.jar')
-    compile files('libs/sdklib.jar')
-    compile files('libs/zipio-lib-1.8.jar')
-    compile files('libs/zipsigner-lib-1.17.jar')
-    compile files('libs/zipsigner-lib-optional-1.17.jar')
-    compile 'com.android.support:support-v4:27.0.1'
-    compile 'com.android.support:appcompat-v7:27.0.1'
-    compile 'com.android.support:design:27.0.1'
-    compile 'com.takisoft.fix:preference-v7:27.0.1.0'
-    compile 'com.google.android.gms:play-services-auth:15.0.1'
-    implementation 'com.google.android.gms:play-services-wearable:15.0.1'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'com.android.support:multidex:1.0.3'
+    implementation files('libs/android-core.jar')
+    implementation files('libs/antlr.jar')
+    implementation files('libs/core-1.51.0.0.jar')
+    implementation files('libs/dx.jar')
+    implementation files('libs/org.eclipse.jdt.core.jar')
+    implementation files('libs/org.eclipse.core.runtime.jar')
+    implementation files('libs/org.eclipse.osgi.jar')
+    implementation files('libs/org.eclipse.equinox.common.jar')
+    implementation files('libs/org.eclipse.core.resources.jar')
+    implementation files('libs/org.eclipse.core.contenttype.jar')
+    implementation files('libs/org.eclipse.equinox.preferences.jar')
+    implementation files('libs/org.eclipse.core.jobs.jar')
+    implementation files('libs/jdi.jar')
+    implementation files('libs/JavaMode.jar')
+    implementation files('libs/jsch-0.1.51.jar')
+    implementation files('libs/kellinwood-logging-android-1.4.jar')
+    implementation files('libs/kellinwood-logging-lib-1.1.jar')
+    implementation files('libs/org.eclipse.jgit-3.5.2.201411120430-r.jar')
+    implementation files('libs/pde.jar')
+    implementation files('libs/pkix-1.51.0.0.jar')
+    implementation files('libs/prov-1.51.0.0.jar')
+    implementation files('libs/sdklib.jar')
+    implementation files('libs/zipio-lib-1.8.jar')
+    implementation files('libs/zipsigner-lib-1.17.jar')
+    implementation files('libs/zipsigner-lib-optional-1.17.jar')
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'com.google.android.material:material:1.1.0'
+    implementation 'com.takisoft.preferencex:preferencex:1.1.0'
+    implementation 'com.google.android.gms:play-services-auth:17.0.0'
+    implementation 'com.google.android.gms:play-services-wearable:17.0.0'
 }

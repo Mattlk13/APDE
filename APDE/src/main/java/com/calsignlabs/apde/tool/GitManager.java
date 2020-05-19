@@ -1,7 +1,7 @@
 package com.calsignlabs.apde.tool;
 
 import android.content.DialogInterface;
-import android.support.v7.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.view.MenuItem;
 
 import com.calsignlabs.apde.APDE;
@@ -41,12 +41,7 @@ public class GitManager implements Tool {
 		repo.close();
 
 		builder.setTitle(R.string.tool_git_manager);
-		builder.setItems(actionNames, new DialogInterface.OnClickListener() {
-			@Override
-			public void onClick(DialogInterface dialog, int which) {
-				actions.get(which).run();
-			}
-		});
+		builder.setItems(actionNames, (dialog, which) -> actions.get(which).run());
 
 		builder.create().show();
 	}

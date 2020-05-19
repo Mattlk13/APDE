@@ -2,7 +2,6 @@ package com.calsignlabs.apde;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.Application;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -17,8 +16,10 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
 import android.preference.PreferenceManager;
-import android.support.v4.content.FileProvider;
-import android.support.v7.app.AlertDialog;
+import androidx.core.content.FileProvider;
+import androidx.appcompat.app.AlertDialog;
+import androidx.multidex.MultiDexApplication;
+
 import android.util.DisplayMetrics;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
@@ -39,6 +40,8 @@ import com.calsignlabs.apde.FileNavigatorAdapter.FileItem;
 import com.calsignlabs.apde.build.ComponentTarget;
 import com.calsignlabs.apde.build.Manifest;
 import com.calsignlabs.apde.build.SketchProperties;
+import com.calsignlabs.apde.build.dag.BuildContext;
+import com.calsignlabs.apde.build.dag.ModularBuild;
 import com.calsignlabs.apde.contrib.Library;
 import com.calsignlabs.apde.support.AndroidPlatform;
 import com.calsignlabs.apde.task.TaskManager;
@@ -46,7 +49,6 @@ import com.calsignlabs.apde.tool.AutoFormat;
 import com.calsignlabs.apde.tool.ColorSelector;
 import com.calsignlabs.apde.tool.CommentUncomment;
 import com.calsignlabs.apde.tool.DecreaseIndent;
-import com.calsignlabs.apde.tool.ExportGradleProject;
 import com.calsignlabs.apde.tool.ExportSignedPackage;
 import com.calsignlabs.apde.tool.FindInReference;
 import com.calsignlabs.apde.tool.FindReplace;
@@ -73,6 +75,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Field;
@@ -85,7 +88,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 
 import processing.app.Platform;
@@ -94,7 +99,7 @@ import processing.app.Platform;
  * This is the Application global state for APDE. It manages things like the
  * currently selected sketch and references to the various activities.
  */
-public class APDE extends Application {
+public class APDE extends MultiDexApplication {
 	public static final String DEFAULT_SKETCHBOOK_LOCATION = "Sketchbook";
 	public static final String LIBRARIES_FOLDER = "libraries";
 	
@@ -113,11 +118,13 @@ public class APDE extends Application {
 	private EditorActivity editor;
 	private SketchPropertiesActivity propertiesActivity;
 	
-	private HashMap<String, ArrayList<Library>> importToLibraryTable;
+	private Map<String, List<Library>> importToLibraryTable = Collections.synchronizedMap(new HashMap<>());
 	private ArrayList<Library> contributedLibraries;
 	
 	private HashMap<String, Tool> packageToToolTable;
 	private ArrayList<Tool> tools;
+	
+	private ModularBuild modularBuild;
 	
 	public static enum SketchLocation {
 		SKETCHBOOK, // A sketch in the sketchbook folder
@@ -804,23 +811,27 @@ public class APDE extends Application {
 	final static double BYTE_PER_GB = 1_073_741_824.0d; // 1024^3
 	
 	public static String getAvailableSpace(File drive) {
-		StatFs stat = new StatFs(drive.getAbsolutePath());
-		
-		DecimalFormat df = new DecimalFormat("#.00");
-		df.setRoundingMode(RoundingMode.HALF_UP);
-		
-		long available;
-		long total;
-		
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-			available = stat.getAvailableBytes();
-			total = stat.getTotalBytes();
-		} else {
-			available = stat.getAvailableBlocks() * stat.getBlockSize();
-			total = stat.getBlockCount() * stat.getBlockSize();
+		try {
+			StatFs stat = new StatFs(drive.getAbsolutePath());
+			
+			DecimalFormat df = new DecimalFormat("#.00");
+			df.setRoundingMode(RoundingMode.HALF_UP);
+			
+			long available;
+			long total;
+			
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+				available = stat.getAvailableBytes();
+				total = stat.getTotalBytes();
+			} else {
+				available = stat.getAvailableBlocks() * stat.getBlockSize();
+				total = stat.getBlockCount() * stat.getBlockSize();
+			}
+			
+			return df.format(available / BYTE_PER_GB) + " GB free of " + df.format(total / BYTE_PER_GB) + " GB";
+		} catch (IllegalArgumentException e) {
+			return "Failed to stat FS";
 		}
-		
-		return df.format(available / BYTE_PER_GB) + " GB free of " + df.format(total / BYTE_PER_GB) + " GB";
 	}
 	
 	/**
@@ -1177,7 +1188,7 @@ public class APDE extends Application {
 	 * @param file
 	 * @throws IOException
 	 */
-    public static void deleteFile(File file) throws IOException {
+    public static void deleteFile(File file, boolean suppressFailure) throws IOException {
     	if (file.exists()) {
 			if (file.isDirectory()) {
 				for (File content : file.listFiles()) {
@@ -1186,10 +1197,18 @@ public class APDE extends Application {
 			}
 		
 			if (!file.delete()) { //Uh-oh...
-				throw new FileNotFoundException("Failed to delete file: " + file);
+				if (suppressFailure) {
+					System.err.println("Failed to delete file: " + file);
+				} else {
+					throw new FileNotFoundException("Failed to delete file: " + file);
+				}
 			}
 		}
     }
+    
+    public static void deleteFile(File file) throws IOException {
+    	deleteFile(file, false);
+	}
 	
 	/**
 	 * @return the current version code of APDE
@@ -1400,14 +1419,20 @@ public class APDE extends Application {
 	 * @return the sketch properties of the current sketch
 	 */
 	public SketchProperties getProperties() {
+		return getProperties(BuildContext.create(this));
+	}
+	
+	public SketchProperties getProperties(BuildContext buildContext) {
 		// TODO maybe load once and store reference?
 		if (needsPropertiesUpgrade()) {
 			// Sketch still has an AndroidManifest.xml, upgrade to sketch.properties
-			return upgradeManifestToProperties();
+			return upgradeManifestToProperties(buildContext);
 		} else {
 			// Load sketch.properties
-			SketchProperties properties = new SketchProperties(this, getSketchPropertiesFile());
-			if (!isExample()) {
+			File propertiesFile = getSketchPropertiesFile();
+			SketchProperties properties = new SketchProperties(buildContext, propertiesFile);
+			// Create properties if they don't exist
+			if (!propertiesFile.exists() && !isExample()) {
 				properties.save(getSketchPropertiesFile());
 			}
 			return properties;
@@ -1424,7 +1449,6 @@ public class APDE extends Application {
 	
 	protected boolean needsPropertiesUpgrade() {
 		// Determine whether or not we need to upgrade to sketch.properties
-		
 		
 		// We can't upgrade if we don't have a manifest
 		if (!(new File(getSketchLocation(), Manifest.MANIFEST_XML)).exists()) {
@@ -1452,10 +1476,10 @@ public class APDE extends Application {
 		}
 	}
 	
-	protected SketchProperties upgradeManifestToProperties() {
+	protected SketchProperties upgradeManifestToProperties(BuildContext buildContext) {
 		// The old AndroidManifest.xml
 		File manifestFile = new File(getSketchLocation(), Manifest.MANIFEST_XML);
-		Manifest manifest = new Manifest(new com.calsignlabs.apde.build.Build(this));
+		Manifest manifest = new Manifest(buildContext);
 		manifest.load(manifestFile, ComponentTarget.APP);
 		
 		// Upgrade to Android mode 3.0 (activity -> fragment) if needed
@@ -1477,16 +1501,29 @@ public class APDE extends Application {
 		return properties;
 	}
 	
+	private File getBuildFolder(boolean alternate) {
+		// Let the user pick where to build
+		if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_build_internal_storage", true) ^ alternate) {
+			return getDir("build", 0);
+		} else {
+			return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getParentFile(), "build");
+		}
+	}
+	
+	public File getBuildFolder() {
+		return getBuildFolder(false);
+	}
+	
+	/**
+	 * @return the other build folder not currently in use, i.e. /sdcard/build if using the internal
+	 * storage to build
+	 */
+	public File getAlternateBuildFolder() {
+		return getBuildFolder(true);
+	}
+	
 	public void rebuildLibraryList() {
-		// Reset the table mapping imports to libraries
-		importToLibraryTable = new HashMap<String, ArrayList<Library>>();
-		
-		// Android mode has no core libraries - but we'll leave this here just in case
-		
-//		coreLibraries = Library.list(librariesFolder);
-//		for (Library lib : coreLibraries) {
-//			lib.addPackageList(importToLibraryTable);
-//		}
+		importToLibraryTable.clear();
 		
 		File contribLibrariesFolder = getLibrariesFolder();
 		if (contribLibrariesFolder != null) {
@@ -1498,7 +1535,7 @@ public class APDE extends Application {
 		}
 	}
 	
-	public HashMap<String, ArrayList<Library>> getImportToLibraryTable() {
+	public Map<String, List<Library>> getImportToLibraryTable() {
 		return importToLibraryTable;
 	}
 	
@@ -1778,6 +1815,14 @@ public class APDE extends Application {
 		intent.setDataAndType(uri, "*/*");
 		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // Start this in a separate task
 		activityContext.startActivity(Intent.createChooser(intent, getResources().getString(R.string.show_sketch_folder_title)));
+	}
+	
+	public ModularBuild getModularBuild() {
+		if (modularBuild == null) {
+			modularBuild = new ModularBuild(this);
+		}
+		
+		return modularBuild;
 	}
 	
 	public static final SimpleDateFormat DEBUG_LOG_TIMESTAMP_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());

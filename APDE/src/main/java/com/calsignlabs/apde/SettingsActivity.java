@@ -9,19 +9,23 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.support.v14.preference.SwitchPreference;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.preference.CheckBoxPreference;
-import android.support.v7.preference.ListPreference;
-import android.support.v7.preference.Preference;
-import android.support.v7.preference.PreferenceCategory;
-import android.support.v7.preference.PreferenceManager;
-import android.support.v7.preference.PreferenceScreen;
-import android.support.v7.widget.Toolbar;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceCategory;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
+import androidx.preference.PreferenceScreen;
+import androidx.appcompat.widget.Toolbar;
+import androidx.preference.SwitchPreferenceCompat;
+
+import android.text.InputFilter;
+import android.text.InputType;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -42,7 +46,6 @@ import com.calsignlabs.apde.build.CopyAndroidJarTask;
 import com.calsignlabs.apde.build.SketchPreviewerBuilder;
 import com.calsignlabs.apde.support.CustomListPreference;
 import com.calsignlabs.apde.support.StockPreferenceFragment;
-import com.takisoft.fix.support.v7.preference.PreferenceFragmentCompat;
 
 import java.util.ArrayList;
 import java.util.Stack;
@@ -111,14 +114,11 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 	protected void onPostCreate(Bundle savedInstanceState) {
 		super.onPostCreate(savedInstanceState);
 		
-		((Toolbar) findViewById(R.id.toolbar)).setNavigationOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-					getSupportFragmentManager().popBackStack();
-				} else {
-					finish();
-				}
+		((Toolbar) findViewById(R.id.toolbar)).setNavigationOnClickListener(v -> {
+			if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+				getSupportFragmentManager().popBackStack();
+			} else {
+				finish();
 			}
 		});
 		
@@ -131,19 +131,16 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 	
 	@SuppressLint("NewApi")
 	public void checkPreferences(PreferenceFragmentCompat frag) {
-		SwitchPreference hardwareKeyboard = ((SwitchPreference) frag.findPreference("use_hardware_keyboard"));
+		SwitchPreferenceCompat hardwareKeyboard = frag.findPreference("use_hardware_keyboard");
 		
 		if(hardwareKeyboard != null) {
-			hardwareKeyboard.setOnPreferenceChangeListener(new CheckBoxPreference.OnPreferenceChangeListener() {
-				@Override
-				public boolean onPreferenceChange(Preference preference, Object newValue) {
-					if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false))
-						getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-					else
-						getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+			hardwareKeyboard.setOnPreferenceChangeListener((preference, newValue) -> {
+				if(PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("use_hardware_keyboard", false))
+					getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+				else
+					getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
 
-					return true;
-				}
+				return true;
 			});
 		}
 		
@@ -156,19 +153,25 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 				((PreferenceCategory) frag.findPreference("pref_general_settings")).removePreference(vibrator);
 		}
 		
-		final SwitchPreference enableUndoRedo = (SwitchPreference) frag.findPreference("pref_key_undo_redo");
+		final SwitchPreferenceCompat enableUndoRedo = frag.findPreference("pref_key_undo_redo");
 		
 		if (enableUndoRedo != null) {
-			enableUndoRedo.setOnPreferenceChangeListener(new CheckBoxPreference.OnPreferenceChangeListener() {
-				@Override
-				public boolean onPreferenceChange(Preference preference, Object newValue) {
-					if (!enableUndoRedo.isChecked()) {
-						//If the user disabled undo / redo, clear the undo history to prevent problems
-						((APDE) getApplicationContext()).getEditor().clearUndoRedoHistory();
-					}
-					
-					return true;
+			enableUndoRedo.setOnPreferenceChangeListener((preference, newValue) -> {
+				if (!enableUndoRedo.isChecked()) {
+					//If the user disabled undo / redo, clear the undo history to prevent problems
+					((APDE) getApplicationContext()).getEditor().clearUndoRedoHistory();
 				}
+				
+				return true;
+			});
+		}
+		
+		Preference cleanBuild = frag.findPreference("pref_build_modular_clean");
+		
+		if (cleanBuild != null) {
+			cleanBuild.setOnPreferenceClickListener(preference -> {
+				((APDE) getApplication()).getModularBuild().clean();
+				return true;
 			});
 		}
 		
@@ -177,28 +180,19 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 		Preference previewUninstall = frag.findPreference("pref_build_preview_uninstall");
 		
 		if (previewReinstall != null && previewPermissions != null && previewUninstall != null) {
-			previewReinstall.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					previewReinstall(new String[] {}, false, false);
-					return true;
-				}
+			previewReinstall.setOnPreferenceClickListener(preference -> {
+				previewReinstall(new String[] {}, false, false);
+				return true;
 			});
 			
-			previewPermissions.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchPreviewPermissions();
-					return true;
-				}
+			previewPermissions.setOnPreferenceClickListener(preference -> {
+				launchPreviewPermissions();
+				return true;
 			});
 			
-			previewUninstall.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					previewUninstall();
-					return true;
-				}
+			previewUninstall.setOnPreferenceClickListener(preference -> {
+				previewUninstall();
+				return true;
 			});
 		}
 		
@@ -217,13 +211,10 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 		Preference recopyAndroidJar = frag.findPreference("pref_build_recopy_android_jar");
 		
 		if (recopyAndroidJar != null) {
-			recopyAndroidJar.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					((APDE) getApplication()).getTaskManager().launchTask("recopyAndroidJarTask", false, null, false, new CopyAndroidJarTask());
-					
-					return true;
-				}
+			recopyAndroidJar.setOnPreferenceClickListener(preference -> {
+				((APDE) getApplication()).getTaskManager().launchTask("recopyAndroidJarTask", false, null, false, new CopyAndroidJarTask());
+				
+				return true;
 			});
 		}
 		
@@ -240,91 +231,70 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 		Preference licenses = frag.findPreference("pref_about_licenses");
 		
 		if (licenses != null) {
-			licenses.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchLicenses();
-					
-					return true;
-				}
+			licenses.setOnPreferenceClickListener(preference -> {
+				launchLicenses();
+				
+				return true;
 			});
 		}
 		
 		Preference googlePlay = frag.findPreference("pref_about_google_play");
 		
 		if (googlePlay != null) {
-			googlePlay.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchGooglePlay();
-					
-					return true;
-				}
+			googlePlay.setOnPreferenceClickListener(preference -> {
+				launchGooglePlay();
+				
+				return true;
 			});
 		}
 		
 		Preference github = frag.findPreference("pref_about_github");
 		
 		if (github != null) {
-			github.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchGitHub();
-					
-					return true;
-				}
+			github.setOnPreferenceClickListener(preference -> {
+				launchGitHub();
+				
+				return true;
 			});
 		}
 		
-		Preference previewChannel = frag.findPreference("pref_about_preview_channel");
+		Preference openBeta = frag.findPreference("pref_about_open_beta");
 		
-		if (previewChannel != null) {
-			previewChannel.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchPreviewChannel();
-					
-					return true;
-				}
+		if (openBeta != null) {
+			openBeta.setOnPreferenceClickListener(preference -> {
+				launchOpenBeta();
+				
+				return true;
 			});
 		}
 		
 		Preference emailDev = frag.findPreference("pref_about_email_dev");
 		
 		if (emailDev != null) {
-			emailDev.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchEmailDev();
-					
-					return true;
-				}
+			emailDev.setOnPreferenceClickListener(preference -> {
+				launchEmailDev();
+				
+				return true;
 			});
 		}
 		
 		Preference updateExamplesNow = frag.findPreference("update_examples_download_now");
 		
 		if (updateExamplesNow != null) {
-			updateExamplesNow.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchUpdateExamplesNow();
-					
-					return true;
-				}
+			updateExamplesNow.setOnPreferenceClickListener(preference -> {
+				launchUpdateExamplesNow();
+				
+				return true;
 			});
 		}
 		
 		Preference displayRecentChanges = frag.findPreference("pref_whats_new_display");
 		
 		if (displayRecentChanges != null) {
-			displayRecentChanges.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-				@Override
-				public boolean onPreferenceClick(Preference preference) {
-					launchDisplayRecentChanges(SettingsActivity.this);
-					
-					return true;
-				}
+			displayRecentChanges.setOnPreferenceClickListener(preference -> {
+				launchDisplayRecentChanges(SettingsActivity.this);
+				
+				return true;
 			});
 		}
 		
@@ -353,25 +323,47 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 			
 			sketchbookDrive.setValue(PreferenceManager.getDefaultSharedPreferences(SettingsActivity.this).getString("pref_sketchbook_drive", ""));
 			
-			sketchbookDrive.init(R.layout.pref_sketchbook_drive_list_item, new CustomListPreference.Populator() {
-				@Override
-				public void populate(View view, int position, CharSequence[] entries) {
-					LinearLayout layout = (LinearLayout) view;
-					
-					APDE.StorageDrive drive = drives.get(position);
-					
-					((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_type)).setText(drive.type.title);
-					((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_space)).setText(drive.space);
-					((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_root)).setText(drive.root.getAbsolutePath());
-				}
-			}, new Runnable() {
-				@Override
-				public void run() {
-					updateSketchbookDrivePref(sketchbookDrive, sketchbookLocation, drives);
-				}
-			});
+			sketchbookDrive.init(R.layout.pref_sketchbook_drive_list_item, (view, position, entries) -> {
+				LinearLayout layout = (LinearLayout) view;
+				
+				APDE.StorageDrive drive = drives.get(position);
+				
+				((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_type)).setText(drive.type.title);
+				((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_space)).setText(drive.space);
+				((TextView) layout.findViewById(R.id.pref_sketchbook_drive_list_item_text_root)).setText(drive.root.getAbsolutePath());
+			}, () -> updateSketchbookDrivePref(sketchbookDrive, sketchbookLocation, drives));
 			
 			updateSketchbookDrivePref(sketchbookDrive, sketchbookLocation, drives);
+		}
+		
+		EditTextPreference codeTextSize = frag.findPreference("textsize");
+		EditTextPreference consoleTextSize = frag.findPreference("textsize_console");
+		EditTextPreference sketchbookLocation = frag.findPreference("pref_sketchbook_location");
+		
+		if (codeTextSize != null) {
+			codeTextSize.setOnBindEditTextListener(editText -> {
+				editText.setInputType(InputType.TYPE_CLASS_NUMBER);
+				editText.setMaxLines(1);
+				editText.setSingleLine();
+				editText.setSelectAllOnFocus(true);
+				editText.setFilters(new InputFilter[] {new InputFilter.LengthFilter(2)});
+			});
+		}
+		if (consoleTextSize != null) {
+			consoleTextSize.setOnBindEditTextListener(editText -> {
+				editText.setInputType(InputType.TYPE_CLASS_NUMBER);
+				editText.setMaxLines(1);
+				editText.setSingleLine();
+				editText.setSelectAllOnFocus(true);
+				editText.setFilters(new InputFilter[] {new InputFilter.LengthFilter(2)});
+			});
+		}
+		if (sketchbookLocation != null) {
+			sketchbookLocation.setOnBindEditTextListener(editText -> {
+				editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+				editText.setMaxLines(1);
+				editText.setSingleLine();
+			});
 		}
 		
 		bindPreferenceSummaryToValue(frag.findPreference("textsize"));
@@ -379,6 +371,8 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 		bindPreferenceSummaryToValue(frag.findPreference("pref_sketchbook_location"));
 		bindPreferenceSummaryToValue(frag.findPreference("pref_key_autosave_timeout"));
 		bindPreferenceSummaryToValue(frag.findPreference("pref_key_undo_redo_keep"));
+		bindPreferenceSummaryToValue(frag.findPreference("pref_key_build_compile_timeout"));
+		bindPreferenceSummaryToValue(frag.findPreference("pref_build_modular_log_level"));
 		bindPreferenceSummaryToValue(frag.findPreference("pref_vr_default_renderer"));
 	}
 	
@@ -405,6 +399,8 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 			if (permissions != null) {
 				previewReinstall(permissions, true, true);
 			}
+		} else {
+			super.onActivityResult(requestCode, resultCode, data);
 		}
 	}
 	
@@ -444,8 +440,8 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 		startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(getResources().getString(R.string.pref_about_github_uri))));
 	}
 	
-	protected void launchPreviewChannel() {
-		startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(getResources().getString(R.string.pref_about_preview_channel_uri))));
+	protected void launchOpenBeta() {
+		startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(getResources().getString(R.string.pref_about_open_beta_uri))));
 	}
 	
 	protected void launchEmailDev() {
@@ -596,7 +592,7 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 	}
 	
 	@Override
-	public boolean onPreferenceStartFragment(android.support.v7.preference.PreferenceFragmentCompat preferenceFragmentCompat, Preference preference) {
+	public boolean onPreferenceStartFragment(androidx.preference.PreferenceFragmentCompat preferenceFragmentCompat, Preference preference) {
 		// This is only ever called from a settings screen, not from the headers fragment
 		
 		StockPreferenceFragment newFragment = new StockPreferenceFragment();
@@ -636,7 +632,7 @@ public class SettingsActivity extends AppCompatActivity implements PreferenceFra
 	}
 	
 	@Override
-	public boolean onPreferenceStartScreen(android.support.v7.preference.PreferenceFragmentCompat preferenceFragmentCompat, PreferenceScreen preferenceScreen) {
+	public boolean onPreferenceStartScreen(androidx.preference.PreferenceFragmentCompat preferenceFragmentCompat, PreferenceScreen preferenceScreen) {
 		return false;
 	}
 	

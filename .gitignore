@@ -1,5 +1,6 @@
 aFileChooser/build/**
 APDE/build/**
+APDE/src/main/gen/**
 wear-companion/build/**
 sketch-preview/build/**
 build/**
@@ -9,9 +10,7 @@ build/**
 .idea/libraries/
 .idea/dictionaries/
 .idea/workspace.xml
-gradle/
 *.log
 local.properties
 *.iml
-gradlew
-gradlew.bat
+APDE/src/main/gen

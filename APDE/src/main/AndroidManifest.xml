@@ -10,13 +10,15 @@
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission-sdk-23 android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+	<uses-permission-sdk-23 android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 	
 	<application
 		android:name=".APDE"
 		android:allowBackup="true"
 		android:icon="@drawable/ic_launcher"
 		android:label="@string/apde_app_title"
-		android:theme="@style/AppTheme">
+		android:theme="@style/AppTheme"
+		android:usesCleartextTraffic="true">
 		
 		<activity
 			android:name=".EditorActivity"
@@ -86,29 +88,13 @@
 			android:name=".vcs.GitHistoryActivity"
 			android:label="@string/git_history"
 			android:theme="@style/FullscreenTheme"/>
-		<!-- This is a hook into the AFileChooser library's custom file chooser activity -->
-		<activity
-			android:name="com.ipaulpro.afilechooser.FileChooserActivity"
-			android:enabled="@bool/use_activity"
-			android:exported="true"
-			android:icon="@drawable/ic_chooser"
-			android:label="@string/file_chooser_title">
-			<intent-filter>
-				<action android:name="android.intent.action.GET_CONTENT"/>
-				
-				<category android:name="android.intent.category.DEFAULT"/>
-				<category android:name="android.intent.category.OPENABLE"/>
-				
-				<data android:mimeType="*/*"/>
-			</intent-filter>
-		</activity>
 		<activity
 			android:name=".ReferenceActivity"
 			android:label="@string/title_activity_reference"
 			android:theme="@style/FullscreenTheme"/>
 		<!-- Lets us share APKs and other files with other applications -->
 		<provider
-			android:name="android.support.v4.content.FileProvider"
+			android:name="androidx.core.content.FileProvider"
 			android:authorities="com.calsignlabs.apde.fileprovider"
 			android:exported="false"
 			android:grantUriPermissions="true">
